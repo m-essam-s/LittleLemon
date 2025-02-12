@@ -1,0 +1,152 @@
+{% extends 'base.html' %} {% load static %} {% block content %}
+<section>
+  <article>
+    <h1>Make a reservation</h1>
+
+    <form id="bookingForm">
+      {% csrf_token %}
+      <p>
+        First Name:
+        <input type="text" id="first_name" name="first_name" required />
+      </p>
+      <p>Name: <input type="text" id="name" name="name" required /></p>
+      <p>Email: <input type="email" id="email" name="email" required /></p>
+      <p>Phone: <input type="text" id="phone" name="phone" required /></p>
+      <p>Guests: <input type="number" id="guests" name="guests" required /></p>
+      <p>
+        Reservation Date:
+        <input
+          type="date"
+          id="reservation_date"
+          name="reservation_date"
+          required
+        />
+      </p>
+      <p>
+        Reservation Time:
+        <select id="reservation_slot" name="reservation_slot" required>
+          <option value="0" disabled>Select time</option>
+        </select>
+      </p>
+
+      <button type="button" onclick="submitForm()">Reserve Now</button>
+    </form>
+
+    <div id="bookings"></div>
+
+    <!--Begin row-->
+    <div class="row">
+      <!--Begin col-->
+      <div class="column">
+        <form action="" method="post">
+          {% csrf_token %} {{form.as_p}}
+          <input type="submit" id="button" />
+        </form>
+      </div>
+      <!--End col-->
+
+      <!--Begin col-->
+      <div class="column">
+        <div class="videowrap">
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d11898.289517452584!2d-87.60853049433447!3d41.79442860243028!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x880e2912ce6f7027%3A0xc0cfb5545d4a37b2!2sHyde%20Park%2C%20Chicago%2C%20IL%2C%20USA!5e0!3m2!1sen!2spt!4v1662384760663!5m2!1sen!2spt"
+            width="600"
+            height="450"
+            style="border: 0"
+            allowfullscreen=""
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+          ></iframe>
+        </div>
+      </div>
+      <!--End col-->
+    </div>
+    <!--End row-->
+  </article>
+</section>
+<!-- Add your code inside the script tags below  -->
+<script>
+  const bookingForm = document.getElementById("bookingForm");
+  const reservationDate = document.getElementById("reservation_date");
+  const reservationSlot = document.getElementById("reservation_slot");
+  const bookingsDiv = document.getElementById("bookings");
+  let reserved_slots = [];
+
+  function formatTime(slot) {
+    const hours = Math.floor(slot / 2) + 10; // Start from 10 AM
+    const minutes = (slot % 2) * 30;
+    const ampm = hours < 12 || hours == 24 ? "AM" : "PM";
+    const formattedHours = hours % 12 || 12; // Handle 12 AM/PM
+    const formattedMinutes = minutes < 10 ? "0" + minutes : minutes;
+
+    return `${formattedHours}:${formattedMinutes} ${ampm}`;
+  }
+
+  function getBookings() {
+    const selectedDate = reservationDate.value;
+    fetch(`/bookings/?date=${selectedDate}`)
+      .then((response) => response.json())
+      .then((data) => {
+        reserved_slots = [];
+        bookingsDiv.innerHTML = ""; // Clear previous bookings
+
+        for (const item of data) {
+          console.log(item.fields);
+          reserved_slots.push(item.fields.reservation_slot);
+          bookingsDiv.innerHTML += `<p>${item.fields.first_name} - ${formatTime(
+            item.fields.reservation_slot
+          )}</p>`;
+        }
+
+        let slot_options = '<option value="0" disabled>Select time</option>';
+        for (let i = 0; i < 20; i++) {
+          // Time slots from 10:00 AM to 7:30 PM in 30-minute intervals
+          const label = formatTime(i);
+          if (reserved_slots.includes(i)) {
+            slot_options += `<option value=${i} disabled>${label}</option>`;
+          } else {
+            slot_options += `<option value=${i}>${label}</option>`;
+          }
+        }
+        reservationSlot.innerHTML = slot_options;
+      });
+  }
+
+  reservationDate.addEventListener("change", getBookings);
+
+  function submitForm() {
+    const firstName = document.getElementById("first_name").value;
+    const selectedDate = reservationDate.value;
+    const selectedSlot = reservationSlot.value;
+
+    fetch("/bookings/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")
+          .value, // Add CSRF token
+      },
+      body: JSON.stringify({
+        first_name: firstName,
+        reservation_date: selectedDate,
+        reservation_slot: parseInt(selectedSlot), // Send slot as integer
+      }),
+    })
+      .then((response) => {
+        if (response.ok) {
+          getBookings(); // Refresh bookings after successful submission
+          bookingForm.reset(); // Clear the form
+          alert("Booking successful!");
+        } else {
+          alert("Booking Failed! Please try again.");
+        }
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        alert("An error occurred. Please try again later.");
+      });
+  }
+
+  getBookings(); // Initial load of bookings on page load
+</script>
+{% endblock %}
